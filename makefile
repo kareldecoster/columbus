@@ -22,7 +22,7 @@ all: $(OBJ)
 	make test
 	
 columbus: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) -o $@ $^ $(CFLAGS) -lm
 	
 test: $(TEST_OBJ)
 	$(CC) -o $@ $^ $(CFLAGS) -lcheck `pkg-config --cflags --libs check`
