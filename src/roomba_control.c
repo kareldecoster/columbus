@@ -160,9 +160,6 @@ int roomba_turn_cw(roomba_t* roomba){
 int roomba_turn_ccw(roomba_t* roomba){
 	char msg[5]={0x89, 0, 0x64, 0x00, 0x01};
 	int i = write(roomba->fd, msg, 5);
-	//char msg[16] = {0x98, 0x0D , 0x89, 0x00, 0x64, 0x00, 0x01,  0x9D, 0x00, 0x5A, 0x89, 0x00, 0x00, 0x80, 0x00, '\n'}; SCRIPT CODE
-	//int i = write(roomba->fd, msg, 16);
-	//i += roomba_play_script(roomba);
 	return i;
 }
 
@@ -173,9 +170,6 @@ int roomba_stop(roomba_t* roomba){
 }
 
 int roomba_drive_distance(roomba_t* roomba, int mm){
-	//char msg[16]={0x98, 0x0D, 0x89, 0x01, 0x2c, 0x80, 0x00, 0x9B, 0x0A, 0x89, 0x00, 0x00, 0x80, 0x00, '\n'};	//10 cm
-	//int i = write(roomba->fd, msg, 16);	
-	//i += roomba_play_script(roomba);
 	int i = roomba_forward(roomba, 100);
 	usleep(mm*100000);
 	i += roomba_stop(roomba);
@@ -201,7 +195,7 @@ double roomba_request_angle(roomba_t* roomba){
 		}
 	}
 	int16_t distance_difference = bytes_to_int(data[4], data[5]);
-	double angle = (distance_difference * 360 )/ ( M_PI * 234 ); /* formula from roomba datasheet, angle in degrees */
+	double angle = distance_difference* 360 * 2 / (ROOMBA_WIDTH) ;
 	return angle;
 }
 
@@ -222,4 +216,121 @@ int16_t roomba_request_distance(roomba_t* roomba){
 	}
 	int16_t distance = bytes_to_int(data[2], data[3]);
 	return -distance;
+}
+
+
+double roomba_turn_degree_cw(roomba_t* roomba, int16_t speed, double angle){
+	roomba_request_angle(roomba);
+	char high, low;
+	high = get_high_byte(speed);
+	low = get_low_byte(speed);
+	char msg[5]={0x89, high, low, 0xff, 0xff};
+	write(roomba->fd, msg, 5);
+	double time = 1000000*(ROOMBA_WIDTH/2)*M_PI*angle/(100*180);
+	usleep(time);
+	roomba_stop(roomba);
+	
+	double actually_turned = roomba_request_angle(roomba);
+	
+	return actually_turned;
+}
+
+double roomba_turn_degree_ccw(roomba_t* roomba, int16_t speed, double angle){
+	roomba_request_angle(roomba);
+	char high, low;
+	high = get_high_byte(speed);
+	low = get_low_byte(speed);
+	char msg[5]={0x89, high, low, 0x00, 0x01};
+	write(roomba->fd, msg, 5);
+	double time = 1000000*(ROOMBA_WIDTH/2)*M_PI*angle/(100*180);
+	usleep(time);
+	roomba_stop(roomba);
+	
+	double actually_turned = roomba_request_angle(roomba);
+	
+	return actually_turned;
+}
+
+double roomba_get_battery(roomba_t* roomba){
+	char msg[2] = {0x8E, 0x03};
+	write(roomba->fd, msg, 2);
+	char data[10];
+	int index = 0;
+	int size = 0;
+	while(index < 10){
+		size = read(roomba->fd, &data[index], 10-index);
+		if(size > 0){
+			index += size;
+		}
+	}
+	uint16_t capacity = bytes_to_int(data[8], data[9]);
+	uint16_t charge  = bytes_to_int(data[6], data[7]);
+	return 100.00 * charge / capacity;
+}
+
+int roomba_get_wall(roomba_t* roomba){
+	char msg[2] = {0x8E, 0x01};
+	write(roomba->fd, msg, 2);
+	char data[10];
+	int index = 0;
+	int size = 0;
+	while(index < 10){
+		size = read(roomba->fd, &data[index], 10-index);
+		if(size > 0){
+			index += size;
+		}
+	}
+	int wall = data[1];
+	return wall;
+}
+
+bumpstate_t roomba_get_bumpstate(roomba_t* roomba){
+	char msg[2] = {0x8E, 0x01};
+	write(roomba->fd, msg, 2);
+	char data[10];
+	int index = 0;
+	int size = 0;
+	while(index < 10){
+		size = read(roomba->fd, &data[index], 10-index);
+		if(size > 0){
+			index += size;
+		}
+	}
+	char byte = data[0];
+	byte = byte%4;
+	if(byte == 3){
+		return B_BOTH;
+	}if(byte == 2){
+		return B_LEFT;
+	}if(byte == 1){
+		return B_RIGHT;
+	}
+	return B_NONE;
+}
+
+cliffstate_t roomba_get_cliffstate(roomba_t* roomba){
+	char msg[2] = {0x8E, 0x01};
+	write(roomba->fd, msg, 2);
+	char data[10];
+	int index = 0;
+	int size = 0;
+	while(index < 10){
+		size = read(roomba->fd, &data[index], 10-index);
+		if(size > 0){
+			index += size;
+		}
+	}
+	if((data[2]==1 || data[3]==1)&&(data[4]==1 || data[5]==1)){
+		return C_FRONT;
+	}if(data[2]==1 || data[3]==1){
+		return C_LEFT;
+	}if(data[4]==1 || data[5]==1){
+		return C_RIGHT;
+	}
+	return C_NO_CLIFF;
+}
+
+int roomba_cover_and_dock(roomba_t* roomba){
+	char msg = 0x8F;
+	return write(roomba->fd, &msg, 1);
 }
