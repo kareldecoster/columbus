@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 int main(){
 	int done = 0;
@@ -15,6 +16,8 @@ int main(){
 	roomba_full_mode(roomba);
 	roomba_save_song_imperial(roomba);
 	char cmd;
+	double percent = roomba_get_battery(roomba);
+	printf("Battery  --    %lf	%% \n", percent);
 	while(!done){
 		printf("Please enter a command:\n");
 		scanf("%c",&cmd);
@@ -33,9 +36,11 @@ int main(){
 			usleep(3000000);
 			roomba_play_song(roomba,0x03);
 		}if(cmd == 'l'){
-			roomba_turn_ccw(roomba);
+			double angle = roomba_turn_degree_ccw(roomba,100, 45.0);
+			printf("angle = %lf\n", angle);
 		}if(cmd =='r'){
-			roomba_turn_cw(roomba);
+			double angle = roomba_turn_degree_cw(roomba, 100, 45.0);
+			printf("angle = %lf\n", angle);
 		}if(cmd == 'x'){
 			roomba_full_mode(roomba);
 			roomba_stop(roomba);
@@ -44,15 +49,59 @@ int main(){
 		}if(cmd == 'b'){
 			roomba_reverse(roomba, 50);
 		}if(cmd == 'w'){
-			roomba_drive_distance(roomba,10);
-		}if(cmd == 'j'){
-			roomba_play_song(roomba,0x00);
-		}if(cmd == 'a'){
-			double angle = roomba_request_angle(roomba);
-			printf("Angle = %lf\n",angle);
+			int wall = roomba_get_wall(roomba);
+			wall == 1 ? printf("Wall Detected.\n"): printf("No Wall Detected.\n");
 		}if(cmd =='d'){
 			int16_t distance = roomba_request_distance(roomba);
 			printf("Distance = %d\n",distance);
+		}if(cmd  == 'k'){
+			bumpstate_t bump = roomba_get_bumpstate(roomba);
+			switch(bump){
+				case B_LEFT:
+					printf("LEFT!\n");
+					break;
+				
+				case B_RIGHT:
+					printf("RIGHT!\n");
+					break;
+					
+				case B_BOTH:
+					printf("BOTH!\n");
+					break;
+					
+				case B_NONE:
+					printf("NONE!\n");
+					break;
+			}
+		}if(cmd == 'g'){
+			roomba_forward(roomba, 100);
+			printf("Driving...\n");
+			while(roomba_get_bumpstate(roomba) == B_NONE){
+				usleep(1000);
+			}
+			printf("woepsie daysie! kben gebotst!\n");
+			roomba_stop(roomba);
+		}if(cmd == 'a'){
+			cliffstate_t cliff = roomba_get_cliffstate(roomba);
+			switch(cliff){
+				case C_LEFT:
+					printf("LEFT!\n");
+					break;
+				
+				case C_RIGHT:
+					printf("RIGHT!\n");
+					break;
+					
+				case C_FRONT:
+					printf("FRONT!\n");
+					break;
+					
+				case C_NO_CLIFF:
+					printf("NO CLIFF!\n");
+					break;
+			}
+		}if(cmd == 'h'){
+			roomba_cover_and_dock(roomba);
 		}
 	}
 	roomba_start(roomba);
